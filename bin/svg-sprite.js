@@ -20,6 +20,8 @@ const merge = require('lodash.merge');
 const File = require('vinyl');
 const yaml = require('js-yaml');
 const glob = require('glob');
+const globParent = require('glob-parent');
+const toAbsoluteGlob = require('to-absolute-glob');
 let yargs = require('yargs');
 const SVGSpriter = require('../lib/svg-sprite.js');
 const { isObject, zipObject } = require('../lib/svg-sprite/utils/index.js');
@@ -123,6 +125,10 @@ function writeFiles(files) {
     }
 
     return written;
+}
+
+function getBasePath(ourGlob, opt) {
+    return globParent(toAbsoluteGlob(ourGlob, opt), {});
 }
 
 // Get document, or throw exception on error
@@ -263,8 +269,9 @@ if ('variables' in config) {
 
 const spriter = new SVGSpriter(config);
 
-argv._.reduce((f, g) => [...f, ...glob.sync(g)], [])
-    .forEach(file => {
+argv._.forEach((g) => {
+    const basePath = getBasePath(g);
+    glob.sync(g).forEach(file => {
         let basename = file;
         file = path.resolve(file);
         const stat = fs.lstatSync(file);
@@ -276,8 +283,9 @@ argv._.reduce((f, g) => [...f, ...glob.sync(g)], [])
             basename = basepos >= 0 ? basename.substr(basepos + 2) : path.basename(file);
         }
 
-        spriter.add(file, basename, fs.readFileSync(file));
+        spriter.add(file, basename, fs.readFileSync(file), basePath);
     });
+})
 
 spriter.compile((error, result) => {
     if (error) {
